@@ -41,15 +41,21 @@ export const POST = async (request: Request): Promise<Response> => {
   // Obtener los datos del formulario de la solicitud
   const formData = await request.formData();
   const audioFile = formData.get("audio");
+  console.log({ audioFile });
 
   // Verificar si se proporcionó un archivo de audio válido
   if (!(audioFile instanceof Blob)) {
-    return new Response(JSON.stringify({ message: "No se proporcionó un archivo de audio válido." }), {
-      status: 400,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    return new Response(
+      JSON.stringify({
+        message: "No se proporcionó un archivo de audio válido.",
+      }),
+      {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
   }
 
   // Configurar el tamaño del fragmento y dividir el archivo de audio en fragmentos
@@ -71,6 +77,8 @@ export const POST = async (request: Request): Promise<Response> => {
   try {
     // Procesar todos los fragmentos en paralelo y obtener los nombres de archivo procesados
     const processedFiles = await Promise.all(chunkBlobs.map(processChunk));
+    const filePath = processedFiles.map((_, i) => `audio_${i}.mp3`);
+    console.log({ filePath });
     console.log("Procesamiento completado con éxito");
     return new Response(JSON.stringify({ processedFiles }), {
       status: 200,
@@ -80,11 +88,16 @@ export const POST = async (request: Request): Promise<Response> => {
     });
   } catch (error) {
     console.log("Se produjo un error durante el procesamiento:", error);
-    return new Response(JSON.stringify({ message: "Se produjo un error durante el procesamiento." }), {
-      status: 500,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    return new Response(
+      JSON.stringify({
+        message: "Se produjo un error durante el procesamiento.",
+      }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
   }
 };
