@@ -21,7 +21,7 @@ export default function Home() {
         body: formData,
       });
       const result = await response.json();
-      console.log({ result: result });
+      console.log({ result });
     } catch (error) {
       console.log({ error });
     }

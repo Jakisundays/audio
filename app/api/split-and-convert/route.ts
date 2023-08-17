@@ -1,5 +1,12 @@
 import Ffmpeg from "fluent-ffmpeg";
 import { Readable } from "stream";
+import fs from "fs";
+// npm i openai
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.NEXT_OPENAI_API_KEY,
+});
 
 // Función asincrónica para procesar un fragmento de audio
 const processChunk = async (chunkBlob: Blob, i: number): Promise<string> => {
@@ -18,8 +25,8 @@ const processChunk = async (chunkBlob: Blob, i: number): Promise<string> => {
     });
 
     // Procesar el fragmento de audio utilizando FFmpeg
+    // .output(outputFileName)
     Ffmpeg(audioStream)
-      .output(outputFileName)
       .format("mp3")
       .on("start", (commandLine: any) => {
         console.log("FFmpeg iniciado con el comando: " + commandLine);
@@ -32,12 +39,21 @@ const processChunk = async (chunkBlob: Blob, i: number): Promise<string> => {
         console.log(`Procesamiento finalizado para ${outputFileName}`);
         resolve(outputFileName);
       })
-      .run();
+      .save(outputFileName);
   });
 };
 
+const createTranscription = async (fileName: string) => {
+  const transcription = await openai.audio.transcriptions.create({
+    file: fs.createReadStream(fileName),
+    model: "whisper-1",
+  });
+
+  return transcription.text;
+};
+
 // Función asincrónica para manejar la solicitud POST
-export const POST = async (request: Request): Promise<Response> => {
+export const POST = async (request: Request) => {
   // Obtener los datos del formulario de la solicitud
   const formData = await request.formData();
   const audioFile = formData.get("audio");
@@ -73,14 +89,30 @@ export const POST = async (request: Request): Promise<Response> => {
     start = end;
   }
   console.log(`Total de fragmentos: ${chunkBlobs.length}`);
+  console.log({ chunkBlobs });
+  // chunkBlobs: [
+  //   Blob { size: 2097152, type: 'audio/mpeg' },
+  //   Blob { size: 2097152, type: 'audio/mpeg' },
+  //   Blob { size: 457517, type: 'audio/mpeg' }
+  // ]
 
   try {
     // Procesar todos los fragmentos en paralelo y obtener los nombres de archivo procesados
     const processedFiles = await Promise.all(chunkBlobs.map(processChunk));
-    const filePath = processedFiles.map((_, i) => `audio_${i}.mp3`);
-    console.log({ filePath });
+    const filePaths = processedFiles.map((_, i) => `audio_${i}.mp3`);
+    console.log({ filePaths });
+    // [ 'audio_0.mp3', 'audio_1.mp3' ]
+    const transcriptions = [];
+
+    // Iterate over each file path and create a transcription
+    for (const filePath of filePaths) {
+      const transcription = await createTranscription(filePath);
+      transcriptions.push(transcription);
+    }
+    console.log({ transcriptions });
+
     console.log("Procesamiento completado con éxito");
-    return new Response(JSON.stringify({ processedFiles }), {
+    return new Response(JSON.stringify({ transcriptions }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",
