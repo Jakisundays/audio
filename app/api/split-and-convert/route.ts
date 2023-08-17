@@ -110,6 +110,17 @@ export const POST = async (request: Request) => {
       transcriptions.push(transcription);
     }
     console.log({ transcriptions });
+    // Eliminamos los archivos de audio procesados para liberar espacio
+    await Promise.all(
+      filePaths.map(async (filePath) => {
+        try {
+          await fs.promises.unlink(filePath);
+          console.log(`Archivo eliminado: ${filePath}`);
+        } catch (error) {
+          console.log(`Error al eliminar el archivo ${filePath}:`, error);
+        }
+      })
+    );
 
     console.log("Procesamiento completado con éxito");
     return new Response(JSON.stringify({ transcriptions }), {
