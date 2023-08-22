@@ -1,15 +1,24 @@
 import Ffmpeg from "fluent-ffmpeg";
 import { Readable } from "stream";
 import fs from "fs";
-// npm i openai
 import OpenAI from "openai";
-import srtParser2 from "srt-parser-2";
-
-const parser = new srtParser2();
 
 const openai = new OpenAI({
   apiKey: process.env.NEXT_OPENAI_API_KEY,
 });
+
+const deleteAudios = async (filePaths: string[]) => {
+  await Promise.all(
+    filePaths.map(async (filePath) => {
+      try {
+        await fs.promises.unlink(filePath);
+        console.log(`Archivo eliminado: ${filePath}`);
+      } catch (error) {
+        console.log(`Error al eliminar el archivo ${filePath}:`, error);
+      }
+    })
+  );
+};
 
 // Función asincrónica para procesar un fragmento de audio
 const processChunk = async (chunkBlob: Blob, i: number): Promise<string> => {
@@ -28,7 +37,6 @@ const processChunk = async (chunkBlob: Blob, i: number): Promise<string> => {
     });
 
     // Procesar el fragmento de audio utilizando FFmpeg
-    // .output(outputFileName)
     Ffmpeg(audioStream)
       .format("mp3")
       .on("start", (commandLine: any) => {
@@ -52,7 +60,6 @@ const createTranscription = async (fileName: string) => {
     model: "whisper-1",
     response_format: "srt",
   });
-
   return transcription;
 };
 
@@ -61,7 +68,6 @@ export const POST = async (request: Request) => {
   // Obtener los datos del formulario de la solicitud
   const formData = await request.formData();
   const audioFile = formData.get("audio");
-  console.log({ audioFile });
 
   // Verificar si se proporcionó un archivo de audio válido
   if (!(audioFile instanceof Blob)) {
@@ -94,88 +100,27 @@ export const POST = async (request: Request) => {
   }
   console.log(`Total de fragmentos: ${chunkBlobs.length}`);
   console.log({ chunkBlobs });
-  // chunkBlobs: [
-  //   Blob { size: 2097152, type: 'audio/mpeg' },
-  //   Blob { size: 2097152, type: 'audio/mpeg' },
-  //   Blob { size: 457517, type: 'audio/mpeg' }
-  // ]
+
+  let filePaths: string[] = [];
 
   try {
     // Procesar todos los fragmentos en paralelo y obtener los nombres de archivo procesados
     const processedFiles = await Promise.all(chunkBlobs.map(processChunk));
-    const filePaths = processedFiles.map((_, i) => `audio_${i}.mp3`);
+    filePaths = processedFiles.map((_, i) => `audio_${i}.mp3`);
     console.log({ filePaths });
-    // [ 'audio_0.mp3', 'audio_1.mp3' ]
-    const transcriptions = [];
 
     const stream = new ReadableStream({
       async start(controller) {
         for (const filePath of filePaths) {
           const transcription = await createTranscription(filePath);
-          transcriptions.push(transcription);
           controller.enqueue(transcription);
         }
-        await Promise.all(
-          filePaths.map(async (filePath) => {
-            try {
-              await fs.promises.unlink(filePath);
-              console.log(`Archivo eliminado: ${filePath}`);
-            } catch (error) {
-              console.log(`Error al eliminar el archivo ${filePath}:`, error);
-            }
-          })
-        );
+        deleteAudios(filePaths);
         controller.close();
       },
     });
 
-    // Iterate over each file path and create a transcription
-    // for (const filePath of filePaths) {
-    //   const transcription = await createTranscription(filePath);
-    //   transcriptions.push(transcription);
-    // }
-    // console.log({ transcriptions, string: transcriptions.join("\n") });
-    // const srt_array = parser.fromSrt(transcriptions.join("\n"));
-    // console.log({ srt_array });
-    // srt_array: [
-    //   {
-    //     id: '1',
-    //     startTime: '00:00:00,000',
-    //     startSeconds: 0,
-    //     endTime: '00:00:10,680',
-    //     endSeconds: 10.68,
-    //     text: 'Vamos a realizar paso a paso esta división, y al final realizaremos su comprobación.'
-    //   },
-    //   {
-    //     id: '2',
-    //     startTime: '00:00:10,680',
-    //     startSeconds: 10.68,
-    //     endTime: '00:00:18,060',
-    //     endSeconds: 18.06,
-    //     text: 'Tenemos 1,607 que es el dividendo, y 2 que es el divisor, entonces tenemos en este caso'
-    //   },
-    //   {
-    //     id: '3',
-    //     startTime: '00:00:18,060',
-    //     startSeconds: 18.06,
-    //     endTime: '00:00:21,380',
-    //     endSeconds: 21.38,
-    //     text: 'una división por una cifra.'
-    //   },]
-
-    // Eliminamos los archivos de audio procesados para liberar espacio
-    // await Promise.all(
-    //   filePaths.map(async (filePath) => {
-    //     try {
-    //       await fs.promises.unlink(filePath);
-    //       console.log(`Archivo eliminado: ${filePath}`);
-    //     } catch (error) {
-    //       console.log(`Error al eliminar el archivo ${filePath}:`, error);
-    //     }
-    //   })
-    // );
-
-    console.log("Procesamiento completado con éxito");
+    console.log("Procesando");
     return new Response(stream, {
       status: 200,
       headers: {
@@ -184,6 +129,9 @@ export const POST = async (request: Request) => {
     });
   } catch (error) {
     console.log("Se produjo un error durante el procesamiento:", error);
+    if (filePaths.length > 0) {
+      deleteAudios(filePaths);
+    }
     return new Response(
       JSON.stringify({
         message: "Se produjo un error durante el procesamiento.",
