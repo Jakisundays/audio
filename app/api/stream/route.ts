@@ -7,6 +7,7 @@ const openai = new OpenAI({
   apiKey: process.env.NEXT_OPENAI_API_KEY,
 });
 
+// Function to delete audio files asynchronously
 const deleteAudios = async (filePaths: string[]) => {
   await Promise.all(
     filePaths.map(async (filePath) => {
@@ -20,7 +21,7 @@ const deleteAudios = async (filePaths: string[]) => {
   );
 };
 
-// Función asincrónica para procesar un fragmento de audio
+// Function to process a chunk of audio asynchronously
 const processChunk = async (chunkBlob: Blob, i: number): Promise<string> => {
   // Obtener el ArrayBuffer del fragmento de audio
   const audioArrayBuffer = await chunkBlob.arrayBuffer();
