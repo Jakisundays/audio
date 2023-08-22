@@ -4,6 +4,7 @@
 /node_modules
 /.pnp
 .pnp.js
+kanye.mp3
 
 # testing
 /coverage

@@ -108,14 +108,35 @@ export const POST = async (request: Request) => {
     // [ 'audio_0.mp3', 'audio_1.mp3' ]
     const transcriptions = [];
 
+    const stream = new ReadableStream({
+      async start(controller) {
+        for (const filePath of filePaths) {
+          const transcription = await createTranscription(filePath);
+          transcriptions.push(transcription);
+          controller.enqueue(transcription);
+        }
+        await Promise.all(
+          filePaths.map(async (filePath) => {
+            try {
+              await fs.promises.unlink(filePath);
+              console.log(`Archivo eliminado: ${filePath}`);
+            } catch (error) {
+              console.log(`Error al eliminar el archivo ${filePath}:`, error);
+            }
+          })
+        );
+        controller.close();
+      },
+    });
+
     // Iterate over each file path and create a transcription
-    for (const filePath of filePaths) {
-      const transcription = await createTranscription(filePath);
-      transcriptions.push(transcription);
-    }
+    // for (const filePath of filePaths) {
+    //   const transcription = await createTranscription(filePath);
+    //   transcriptions.push(transcription);
+    // }
     // console.log({ transcriptions, string: transcriptions.join("\n") });
-    const srt_array = parser.fromSrt(transcriptions.join("\n"));
-    console.log({ srt_array });
+    // const srt_array = parser.fromSrt(transcriptions.join("\n"));
+    // console.log({ srt_array });
     // srt_array: [
     //   {
     //     id: '1',
@@ -142,21 +163,20 @@ export const POST = async (request: Request) => {
     //     text: 'una división por una cifra.'
     //   },]
 
-
     // Eliminamos los archivos de audio procesados para liberar espacio
-    await Promise.all(
-      filePaths.map(async (filePath) => {
-        try {
-          await fs.promises.unlink(filePath);
-          console.log(`Archivo eliminado: ${filePath}`);
-        } catch (error) {
-          console.log(`Error al eliminar el archivo ${filePath}:`, error);
-        }
-      })
-    );
+    // await Promise.all(
+    //   filePaths.map(async (filePath) => {
+    //     try {
+    //       await fs.promises.unlink(filePath);
+    //       console.log(`Archivo eliminado: ${filePath}`);
+    //     } catch (error) {
+    //       console.log(`Error al eliminar el archivo ${filePath}:`, error);
+    //     }
+    //   })
+    // );
 
     console.log("Procesamiento completado con éxito");
-    return new Response(JSON.stringify(srt_array), {
+    return new Response(stream, {
       status: 200,
       headers: {
         "Content-Type": "application/json",
