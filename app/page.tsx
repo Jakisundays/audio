@@ -18,13 +18,6 @@ type SRTItem = {
   text: string;
 };
 
-function calculateSeconds(timeString: string): number {
-  const [, hours, minutes, seconds] = /(\d{2}):(\d{2}):(\d{2}),(\d{3})/.exec(
-    timeString
-  )!;
-  return parseFloat(seconds) + parseInt(minutes) * 60 + parseInt(hours) * 3600;
-}
-
 // Define the main functional component for the Home page
 export default function Home() {
   // State to store the transcription data
