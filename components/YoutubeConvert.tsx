@@ -1,17 +1,24 @@
 "use client";
 import { FieldValues, SubmitHandler, set, useForm } from "react-hook-form";
 import { IoPlay } from "react-icons/io5";
+import srtParser2 from "srt-parser-2";
 
-const YoutubeConvert = () => {
+type Props = {
+  setState: React.Dispatch<React.SetStateAction<any>>;
+};
+
+const YoutubeConvert = ({ setState }: Props) => {
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm({
     defaultValues: {
-        url: "https://www.youtube.com/watch?v=kA16RAObzYo&ab_channel=Codevolution",
-    }
+      url: "https://www.youtube.com/watch?v=S2-bjGkcaJI&ab_channel=DanielRodrigues",
+    },
   });
+
+  const parser = new srtParser2();
 
   const onYoutubeSubmit: SubmitHandler<FieldValues> = async (data) => {
     console.log({ data: data.url });
@@ -20,10 +27,25 @@ const YoutubeConvert = () => {
         method: "POST",
         body: JSON.stringify({ url: data.url }),
       });
-      const result = await response.json();
+      // const result = await response.json();
+      if (!response.body) {
+        console.log("Response has no body");
+        return;
+      }
+      const reader = response.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
 
-      console.log({ result });
-      // setTranscription(result.transcriptions[0]);
+        if (done) {
+          console.log("Stream has ended");
+          break;
+        }
+
+        // Decode the received data and parse it as SRT subtitles
+        const text = new TextDecoder().decode(value);
+        const srt_array = parser.fromSrt(text);
+        setState((prev: any) => [...prev, ...srt_array]);
+      }
     } catch (error) {
       console.log({ error });
     }

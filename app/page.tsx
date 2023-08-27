@@ -18,19 +18,10 @@ type SRTItem = {
   text: string;
 };
 
-function calculateSeconds(timeString: string): number {
-  const [, hours, minutes, seconds] = /(\d{2}):(\d{2}):(\d{2}),(\d{3})/.exec(
-    timeString
-  )!;
-  return parseFloat(seconds) + parseInt(minutes) * 60 + parseInt(hours) * 3600;
-}
-
 // Define the main functional component for the Home page
 export default function Home() {
   // State to store the transcription data
-  // const [transcription, setTranscription] = useState<SRTItem[]>([]);
-  // String or srt
-  const [transcription, setTranscription] = useState<string>("");
+  const [transcription, setTranscription] = useState<SRTItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Form handling using react-hook-form
@@ -53,15 +44,10 @@ export default function Home() {
       formData.append("audio", data.audio[0]); // 'audio' should match the backend's expected field name
 
       // Send a POST request to the /api/stream endpoint with the audio data
-      const response = await fetch("/api/text", {
+      const response = await fetch("/api/stream", {
         method: "POST",
         body: formData,
       });
-      // String or srt
-      // const response = await fetch("/api/stream", {
-      //   method: "POST",
-      //   body: formData,
-      // });
 
       setLoading(false);
 
@@ -85,18 +71,14 @@ export default function Home() {
 
         // Decode the received data and parse it as SRT subtitles
         const text = new TextDecoder().decode(value);
-        setTranscription((prev) => prev + " " + text);
-        // String or srt
+        const srt_array = parser.fromSrt(text);
 
-        // const srt_array = parser.fromSrt(text);
         // Update the transcription state with the parsed subtitles
-        // setTranscription((prev) => [...prev, ...srt_array]);
+        setTranscription((prev) => [...prev, ...srt_array]);
       }
     } catch (error) {
       console.log({ error });
       setLoading(false);
-    } finally {
-      console.log({ transcription });
     }
   };
 
@@ -131,15 +113,14 @@ export default function Home() {
             <ImArrowRight size={20} />
           </button>
         </form>
-        {/* <YoutubeConvert /> */}
+        <YoutubeConvert setState={setTranscription} />
       </div>
 
       {/* Display the transcribed subtitles */}
       <div className="flex flex-col items-center justify-center overflow-x-hidden overflow-y-auto">
         {/* Display subtitles if available, otherwise show a message */}
         {transcription ? (
-          // transcription.map((item, i) => <Subtitle key={i} {...item} />)
-          <p>{transcription}</p>
+          transcription.map((item, i) => <Subtitle key={i} {...item} />)
         ) : (
           <p>No hay transcripcion</p>
         )}
