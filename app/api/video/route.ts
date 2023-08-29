@@ -78,72 +78,110 @@ const createTranscription = async (fileName: string) => {
   return transcription;
 };
 
+const videoToAudio = async (video: Blob, user: string): Promise<string> => {
+  const audioArrayBuffer = await video.arrayBuffer();
+  const audioStream = new Readable({
+    read() {
+      const buffer = Buffer.from(audioArrayBuffer);
+      this.push(buffer);
+      this.push(null);
+    },
+  });
+  const outputFileName = `onlyaudio-${user}.mp3`;
+  return new Promise((resolve, reject) => {
+    Ffmpeg(audioStream)
+      .toFormat("mp3")
+      .on("start", (commandLine: any) => {
+        console.log("FFmpeg iniciado con el comando: " + commandLine);
+      })
+      .on("error", (err: any) => {
+        console.log("Se produjo un error: " + err.message);
+        reject("Error with ffmpeg");
+      })
+      .on("end", () => {
+        console.log(`Procesamiento finalizado para ${outputFileName}`);
+        resolve(outputFileName);
+      })
+      .save(outputFileName);
+  });
+};
+
+const audioFileToBlob = async (audioFilePath: string): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    fs.readFile(audioFilePath, (err, data) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+
+      const blob = new Blob([data], { type: "audio/mp3" });
+      resolve(blob);
+    });
+  });
+};
+
 // Función asincrónica para manejar la solicitud POST
 export const POST = async (request: Request) => {
-  // Obtener los datos del formulario de la solicitud
-  const formData = await request.formData();
-  const audioFile = formData.get("audio");
-
-  console.log({ audioFile });
-
-  // Verificar si se proporcionó un archivo de audio válido
-  if (!(audioFile instanceof Blob)) {
-    return new Response(
-      JSON.stringify({
-        message: "No se proporcionó un archivo de audio válido.",
-      }),
-      {
-        status: 400,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
-  }
-
-  const chunkType = extractType(audioFile);
-
-  if (!chunkType) {
-    throw new Error("No se pudo determinar el tipo de archivo");
-  }
-
-  // Configurar el tamaño del fragmento y dividir el archivo de audio en fragmentos
-  const cuantosMB: number = 2;
-  const CHUNK_SIZE = cuantosMB * 1024 * 1024;
-  const chunkBlobs: Blob[] = [];
-  let start = 0;
-
-  while (start < audioFile.size) {
-    const end = Math.min(start + CHUNK_SIZE, audioFile.size);
-    const chunkBlob = new Blob([audioFile.slice(start, end)], {
-      type: audioFile.type,
-    });
-    chunkBlobs.push(chunkBlob);
-    start = end;
-  }
-  console.log(`Total de fragmentos: ${chunkBlobs.length}`);
-  console.log({ chunkBlobs });
-
   let filePaths: string[] = [];
-
   try {
-    // Procesar todos los fragmentos en paralelo y obtener los nombres de archivo procesados
+    // Obtener los datos del formulario de la solicitud
+    const formData = await request.formData();
+    const video = formData.get("video");
+
+    // Verificar si se proporcionó un archivo de audio válido
+    if (!(video instanceof Blob)) {
+      return new Response(
+        JSON.stringify({
+          message: "No se proporcionó un archivo de audio válido.",
+        }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
+    const chunkType = extractType(video);
+
+    if (!chunkType) {
+      throw new Error("No se pudo determinar el tipo de archivo");
+    }
+
+    const audioNoVidPath = await videoToAudio(video, "hasbulla");
+
+    const audioBlob = await audioFileToBlob(audioNoVidPath);
+    // Procesar el fragmento de audio utilizando FFmpeg
+
+    const cuantosMB: number = 2;
+    const CHUNK_SIZE = cuantosMB * 1024 * 1024;
+    const chunkBlobs: Blob[] = [];
+
+    let start = 0;
+
+    while (start < audioBlob.size) {
+      const end = Math.min(start + CHUNK_SIZE, audioBlob.size);
+      const chunkBlob = new Blob([audioBlob.slice(start, end)], {
+        type: audioBlob.type,
+      });
+      chunkBlobs.push(chunkBlob);
+      start = end;
+    }
     const processedFiles = await Promise.all(chunkBlobs.map(processChunk));
     filePaths = processedFiles.map((_, i) => `audio_${i}.mp3`);
-    console.log({ filePaths });
-
     const stream = new ReadableStream({
       async start(controller) {
         for (const filePath of filePaths) {
           const transcription = await createTranscription(filePath);
           controller.enqueue(transcription);
         }
-        // deleteAudios(filePaths);
+        deleteAudios(filePaths);
         controller.close();
       },
     });
 
-    console.log("Procesando");
+    // Configurar el tamaño del fragmento y dividir el archivo de audio en fragmentos
     return new Response(stream, {
       status: 200,
       headers: {
@@ -152,9 +190,9 @@ export const POST = async (request: Request) => {
     });
   } catch (error) {
     console.log("Se produjo un error durante el procesamiento:", error);
-    // if (filePaths.length > 0) {
-    //   deleteAudios(filePaths);
-    // }
+    if (filePaths.length > 0) {
+      deleteAudios(filePaths);
+    }
     return new Response(
       JSON.stringify({
         message: "Se produjo un error durante el procesamiento.",

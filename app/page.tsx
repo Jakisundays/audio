@@ -7,6 +7,7 @@ import { FieldValues, SubmitHandler, set, useForm } from "react-hook-form"; // I
 import { ImArrowRight } from "react-icons/im"; // Import arrow right icon from react-icons
 import Subtitle from "@/components/Subtitle"; // Import Subtitle component
 import YoutubeConvert from "@/components/YoutubeConvert";
+import VidToAudio from "@/components/VidToAudio";
 
 // Define the type for each SRT subtitle item
 type SRTItem = {
@@ -95,6 +96,7 @@ export default function Home() {
     <main className="flex min-h-screen flex-col items-center justify-between p-24">
       {/* Form for uploading the audio file */}
       <div className="flex items-center justify-around w-screen">
+        <VidToAudio setState={setTranscription} setLoading={setLoading} />
         <form
           onSubmit={handleSubmit(onSubmit)}
           className="flex justify-between items-center gap-3"
@@ -113,7 +115,7 @@ export default function Home() {
             <ImArrowRight size={20} />
           </button>
         </form>
-        <YoutubeConvert setState={setTranscription} />
+        <YoutubeConvert setState={setTranscription} setLoading={setLoading} />
       </div>
 
       {/* Display the transcribed subtitles */}
