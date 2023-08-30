@@ -51,8 +51,9 @@ const processChunk = async (chunkBlob: Blob, i: number): Promise<string> => {
     });
 
     // Procesar el fragmento de audio utilizando FFmpeg
+    // .format(chunkType)
+    // .videoFilters('setpts=2*PTS')
     Ffmpeg(audioStream)
-      // .format(chunkType)
       .toFormat("mp3")
       .on("start", (commandLine: any) => {
         console.log("FFmpeg iniciado con el comando: " + commandLine);

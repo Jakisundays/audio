@@ -68,7 +68,7 @@ const VidToAudio = ({ setState, setLoading }: Props) => {
           {...register("vid", {
             required: "Por favor selecciona un archivo de audio", // Validation message for required field
           })}
-          accept="audio/*"
+          accept="video/*"
         />
         <button className="btn btn-ghost" type="submit">
           <IoPlay size={20} />
