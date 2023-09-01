@@ -139,7 +139,7 @@ export const POST = async (request: Request) => {
           const transcription = await createTranscription(filePath);
           controller.enqueue(transcription);
         }
-        // deleteAudios(filePaths);
+        deleteAudios(filePaths);
         controller.close();
       },
     });
@@ -153,9 +153,9 @@ export const POST = async (request: Request) => {
     });
   } catch (error) {
     console.log("Se produjo un error durante el procesamiento:", error);
-    // if (filePaths.length > 0) {
-    //   deleteAudios(filePaths);
-    // }
+    if (filePaths.length > 0) {
+      deleteAudios(filePaths);
+    }
     return new Response(
       JSON.stringify({
         message: "Se produjo un error durante el procesamiento.",
