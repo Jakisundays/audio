@@ -8,7 +8,7 @@ import srtParser2 from "srt-parser-2";
 const parser = new srtParser2();
 
 const openai = new OpenAI({
-  apiKey: process.env.NEXT_OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 // Función asincrónica para procesar un fragmento de audio

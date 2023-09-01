@@ -2,7 +2,7 @@
 
 // Import required dependencies and components
 import srtParser2 from "srt-parser-2"; // Import SRT subtitle parsing library
-import { useState } from "react"; // Import the useState hook from React
+import { useEffect, useState } from "react"; // Import the useState hook from React
 import { FieldValues, SubmitHandler, set, useForm } from "react-hook-form"; // Import form handling hooks from react-hook-form library
 import { ImArrowRight } from "react-icons/im"; // Import arrow right icon from react-icons
 import Subtitle from "@/components/Subtitle"; // Import Subtitle component
@@ -19,11 +19,62 @@ type SRTItem = {
   text: string;
 };
 
+const convertSRTItemsToString = (srtItems: SRTItem[]): string => {
+  const textList: string[] = [];
+
+  srtItems.forEach((item) => {
+    textList.push(item.text);
+  });
+
+  const resultString = textList.join(" ");
+  return resultString;
+};
+
 // Define the main functional component for the Home page
 export default function Home() {
   // State to store the transcription data
   const [transcription, setTranscription] = useState<SRTItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+  const [summary, setSummary] = useState("");
+
+  // useEffect(() => {
+  //   if (done) {
+  //     getSummary();
+  //   }
+  // }, [done]);
+
+  const getSummary = async () => {
+    // const formData = new FormData();
+    const text = convertSRTItemsToString(transcription);
+    // formData.append("text", convertedTranscription);
+    try {
+      const response = await fetch("/api/summary", {
+        method: "POST",
+        body: JSON.stringify(text),
+      });
+
+      const data = await response.json();
+      console.log({ data });
+      // setSummary(data.text);
+      // if (!response.body) {
+      //   console.log("Response has no body");
+      //   return;
+      // }
+      // const reader = response.body.getReader();
+      // while (true) {
+      //   const { done, value } = await reader.read();
+      //   if (done) {
+      //     console.log("Stream has ended");
+      //     break;
+      //   }
+      //   const text = new TextDecoder().decode(value);
+      //   setSummary(text);
+      // }
+    } catch (error) {
+      console.log({ error });
+    }
+  };
 
   // Form handling using react-hook-form
   const {
@@ -77,9 +128,14 @@ export default function Home() {
         // Update the transcription state with the parsed subtitles
         setTranscription((prev) => [...prev, ...srt_array]);
       }
+      // console.log("Stream has ended");
+
+      // console.log({ convertedTranscription });
     } catch (error) {
       console.log({ error });
       setLoading(false);
+    } finally {
+      setDone(true);
     }
   };
 
@@ -116,6 +172,17 @@ export default function Home() {
           </button>
         </form>
         <YoutubeConvert setState={setTranscription} setLoading={setLoading} />
+        <div>
+          <button
+            className="btn btn-warning"
+            onClick={() => {
+              getSummary();
+            }}
+            disabled={!done}
+          >
+            Resumen
+          </button>
+        </div>
       </div>
 
       {/* Display the transcribed subtitles */}
@@ -127,6 +194,7 @@ export default function Home() {
           <p>No hay transcripcion</p>
         )}
       </div>
+      <div>{summary ? summary : "No hay resumen"}</div>
     </main>
   );
 }

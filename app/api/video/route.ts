@@ -4,7 +4,7 @@ import fs from "fs";
 import OpenAI from "openai";
 
 const openai = new OpenAI({
-  apiKey: process.env.NEXT_OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 const extractType = (blob: Blob): string | null => {
