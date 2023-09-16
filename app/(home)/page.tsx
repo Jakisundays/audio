@@ -90,7 +90,7 @@ export default function Home() {
       let response;
 
       if (audio.type == "audio/mpeg") {
-        response = await fetch("http://localhost:8080/api/stream", {
+        response = await fetch("/api/stream", {
           method: "POST",
           body: formData,
         });
