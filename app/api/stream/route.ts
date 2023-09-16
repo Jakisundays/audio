@@ -1,91 +1,10 @@
-import Ffmpeg from "fluent-ffmpeg";
-import { Readable } from "stream";
-import fs from "fs";
-import OpenAI from "openai";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-const extractType = (blob: Blob): string | null => {
-  const type = blob.type;
-  const slashIndex = type.indexOf("/");
-
-  if (slashIndex !== -1 && slashIndex < type.length - 1) {
-    return type.substr(slashIndex + 1);
-  }
-
-  return null;
-};
-
-// Function to delete audio files asynchronously
-const deleteAudios = async (filePaths: string[]) => {
-  await Promise.all(
-    filePaths.map(async (filePath) => {
-      try {
-        await fs.promises.unlink(filePath);
-        console.log(`Archivo eliminado: ${filePath}`);
-      } catch (error) {
-        console.log(`Error al eliminar el archivo ${filePath}:`, error);
-      }
-    })
-  );
-};
-
-// Function to process a chunk of audio asynchronously
-const processChunk = async (chunkBlob: Blob, i: number): Promise<string> => {
-  // Obtener el ArrayBuffer del fragmento de audio
-  // const chunkType = extractType(chunkBlob);
-
-  const audioArrayBuffer = await chunkBlob.arrayBuffer();
-  const outputFileName = `audio_${i}.mp3`; // Nombre del archivo de salida
-
-  return new Promise((resolve, reject) => {
-    // Crear un flujo legible a partir del ArrayBuffer
-    const audioStream = new Readable({
-      read() {
-        const buffer = Buffer.from(audioArrayBuffer);
-        this.push(buffer);
-        this.push(null);
-      },
-    });
-
-    // Procesar el fragmento de audio utilizando FFmpeg
-    // .format(chunkType)
-    // .videoFilters('setpts=2*PTS')
-    Ffmpeg(audioStream)
-      .toFormat("mp3")
-      .on("start", (commandLine: any) => {
-        console.log("FFmpeg iniciado con el comando: " + commandLine);
-      })
-      .on("error", (err: any) => {
-        console.log("Se produjo un error: " + err.message);
-        reject(err);
-      })
-      .on("end", () => {
-        console.log(`Procesamiento finalizado para ${outputFileName}`);
-        resolve(outputFileName);
-      })
-      .save(outputFileName);
-  });
-};
-
-const createTranscription = async (fileName: string) => {
-  const transcription = await openai.audio.transcriptions.create({
-    file: fs.createReadStream(fileName),
-    model: "whisper-1",
-    response_format: "srt",
-  });
-  return transcription;
-};
+import { createTranscription, deleteAudios, extractType, processChunk } from "@/utils/audioHelpers";
 
 // Función asincrónica para manejar la solicitud POST
 export const POST = async (request: Request) => {
   // Obtener los datos del formulario de la solicitud
   const formData = await request.formData();
   const audioFile = formData.get("audio");
-
-  console.log({ audioFile });
 
   // Verificar si se proporcionó un archivo de audio válido
   if (!(audioFile instanceof Blob)) {

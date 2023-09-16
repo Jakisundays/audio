@@ -1,14 +1,17 @@
-import {
-  audioFileToBlob,
-  convertToMp3,
-  createTranscription,
-  deleteAudios,
-  download,
-  processChunk,
-} from "@/utils/audioHelpers";
+import OpenAI from "openai";
+import ytdl from "ytdl-core";
+import fs from "fs";
+import Ffmpeg from "fluent-ffmpeg";
+import { Readable } from "stream";
 
 export const POST = async (request: Request) => {
   const { url } = await request.json();
+  const videoId = url.match(/\d+/g);
+  const configLink = `https://player.vimeo.com/video/${videoId[0]}/config`;
+
+  
+
+
   let filePaths: string[] = [];
   try {
     const youtubeVidId = download(url);

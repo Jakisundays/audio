@@ -1,132 +1,21 @@
-import Ffmpeg from "fluent-ffmpeg";
-import { Readable } from "stream";
-import fs from "fs";
-import OpenAI from "openai";
+import {
+  audioFileToBlob,
+  createTranscription,
+  deleteAudios,
+  extractType,
+  processChunk,
+  videoToAudio,
+} from "@/utils/audioHelpers";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-const extractType = (blob: Blob): string | null => {
-  const type = blob.type;
-  const slashIndex = type.indexOf("/");
-
-  if (slashIndex !== -1 && slashIndex < type.length - 1) {
-    return type.substr(slashIndex + 1);
-  }
-
-  return null;
-};
-
-// Function to delete audio files asynchronously
-const deleteAudios = async (filePaths: string[]) => {
-  await Promise.all(
-    filePaths.map(async (filePath) => {
-      try {
-        await fs.promises.unlink(filePath);
-        console.log(`Archivo eliminado: ${filePath}`);
-      } catch (error) {
-        console.log(`Error al eliminar el archivo ${filePath}:`, error);
-      }
-    })
-  );
-};
-
-// Function to process a chunk of audio asynchronously
-const processChunk = async (chunkBlob: Blob, i: number): Promise<string> => {
-  // Obtener el ArrayBuffer del fragmento de audio
-  // const chunkType = extractType(chunkBlob);
-
-  const audioArrayBuffer = await chunkBlob.arrayBuffer();
-  const outputFileName = `audio_${i}.mp3`; // Nombre del archivo de salida
-
-  return new Promise((resolve, reject) => {
-    // Crear un flujo legible a partir del ArrayBuffer
-    const audioStream = new Readable({
-      read() {
-        const buffer = Buffer.from(audioArrayBuffer);
-        this.push(buffer);
-        this.push(null);
-      },
-    });
-
-    // Procesar el fragmento de audio utilizando FFmpeg
-    Ffmpeg(audioStream)
-      // .format(chunkType)
-      .toFormat("mp3")
-      .on("start", (commandLine: any) => {
-        console.log("FFmpeg iniciado con el comando: " + commandLine);
-      })
-      .on("error", (err: any) => {
-        console.log("Se produjo un error: " + err.message);
-        reject(err);
-      })
-      .on("end", () => {
-        console.log(`Procesamiento finalizado para ${outputFileName}`);
-        resolve(outputFileName);
-      })
-      .save(outputFileName);
-  });
-};
-
-const createTranscription = async (fileName: string) => {
-  const transcription = await openai.audio.transcriptions.create({
-    file: fs.createReadStream(fileName),
-    model: "whisper-1",
-    response_format: "srt",
-  });
-  return transcription;
-};
-
-const videoToAudio = async (video: Blob, user: string): Promise<string> => {
-  const audioArrayBuffer = await video.arrayBuffer();
-  const audioStream = new Readable({
-    read() {
-      const buffer = Buffer.from(audioArrayBuffer);
-      this.push(buffer);
-      this.push(null);
-    },
-  });
-  const outputFileName = `onlyaudio-${user}.mp3`;
-  return new Promise((resolve, reject) => {
-    Ffmpeg(audioStream)
-      .toFormat("mp3")
-      .on("start", (commandLine: any) => {
-        console.log("FFmpeg iniciado con el comando: " + commandLine);
-      })
-      .on("error", (err: any) => {
-        console.log("Se produjo un error: " + err.message);
-        reject("Error with ffmpeg");
-      })
-      .on("end", () => {
-        console.log(`Procesamiento finalizado para ${outputFileName}`);
-        resolve(outputFileName);
-      })
-      .save(outputFileName);
-  });
-};
-
-const audioFileToBlob = async (audioFilePath: string): Promise<Blob> => {
-  return new Promise((resolve, reject) => {
-    fs.readFile(audioFilePath, (err, data) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-
-      const blob = new Blob([data], { type: "audio/mp3" });
-      resolve(blob);
-    });
-  });
-};
 
 // Función asincrónica para manejar la solicitud POST
 export const POST = async (request: Request) => {
+  console.log("entrando a video to audio");
   let filePaths: string[] = [];
   try {
     // Obtener los datos del formulario de la solicitud
     const formData = await request.formData();
-    const video = formData.get("video");
+    const video = formData.get("audio");
 
     // Verificar si se proporcionó un archivo de audio válido
     if (!(video instanceof Blob)) {

@@ -38,12 +38,6 @@ export default function Home() {
   const [done, setDone] = useState(false);
   const [summary, setSummary] = useState("");
 
-  // useEffect(() => {
-  //   if (done) {
-  //     getSummary();
-  //   }
-  // }, [done]);
-
   const getSummary = async () => {
     // const formData = new FormData();
     const text = convertSRTItemsToString(transcription);
@@ -55,6 +49,7 @@ export default function Home() {
       });
 
       const data = await response.json();
+      // aca esta el resumen
       console.log({ data });
       // setSummary(data.text);
       // if (!response.body) {
@@ -77,11 +72,7 @@ export default function Home() {
   };
 
   // Form handling using react-hook-form
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm();
+  const { register, handleSubmit } = useForm();
 
   // Create an instance of the SRT parser
   const parser = new srtParser2();
@@ -90,29 +81,44 @@ export default function Home() {
   const onSubmit: SubmitHandler<FieldValues> = async (data) => {
     console.log("🚀 Starting transcription process...");
     setLoading(true);
+    const audio = data.audio[0];
     try {
       // Create a FormData object to send the audio file to the backend
       const formData = new FormData();
-      formData.append("audio", data.audio[0]); // 'audio' should match the backend's expected field name
+      formData.append("audio", audio); // 'audio' should match the backend's expected field name
+
+      let response;
+
+      if (audio.type == "audio/mpeg") {
+        response = await fetch("http://localhost:8080/api/stream", {
+          method: "POST",
+          body: formData,
+        });
+      } else {
+        response = await fetch("/api/video", {
+          method: "POST",
+          body: formData,
+        });
+      }
 
       // Send a POST request to the /api/stream endpoint with the audio data
-      const response = await fetch("/api/stream", {
-        method: "POST",
-        body: formData,
-      });
 
       setLoading(false);
 
-      // Check if the response has a body
+      // // Check if the response has a body
       if (!response.body) {
         console.log("Response has no body");
         return;
       }
+      // const data = await response.json();
+      // console.log({ data });
+      console.log("Response has a body", response.body);
 
-      // Create a reader to read the streamed response data
+      // // Create a reader to read the streamed response data
       const reader = response.body.getReader();
 
-      // Process the streamed data in a loop
+
+      // // Process the streamed data in a loop
       while (true) {
         const { done, value } = await reader.read();
 
@@ -120,7 +126,7 @@ export default function Home() {
           console.log("Stream has ended");
           break;
         }
-
+        console.log({value})
         // Decode the received data and parse it as SRT subtitles
         const text = new TextDecoder().decode(value);
         const srt_array = parser.fromSrt(text);
@@ -128,9 +134,6 @@ export default function Home() {
         // Update the transcription state with the parsed subtitles
         setTranscription((prev) => [...prev, ...srt_array]);
       }
-      // console.log("Stream has ended");
-
-      // console.log({ convertedTranscription });
     } catch (error) {
       console.log({ error });
       setLoading(false);
@@ -138,6 +141,19 @@ export default function Home() {
       setDone(true);
     }
   };
+
+  // const onSubmit: SubmitHandler<FieldValues> = async (data) => {
+  //   setLoading(true);
+  //   const audio = data.audio[0];
+  //   const formData = new FormData();
+  //   formData.append("audio", audio);
+  //   const response = await fetch("http://localhost:4000", {
+  //     method: "POST",
+  //     body: formData,
+  //   });
+  //   const res = await response.json();
+  //   console.log({ res });
+  // };
 
   if (loading) {
     return (
@@ -152,7 +168,7 @@ export default function Home() {
     <main className="flex min-h-screen flex-col items-center justify-between p-24">
       {/* Form for uploading the audio file */}
       <div className="flex items-center justify-around w-screen">
-        <VidToAudio setState={setTranscription} setLoading={setLoading} />
+        {/* <VidToAudio setState={setTranscription} setLoading={setLoading} /> */}
         <form
           onSubmit={handleSubmit(onSubmit)}
           className="flex justify-between items-center gap-3"
@@ -164,7 +180,7 @@ export default function Home() {
             {...register("audio", {
               required: "Por favor selecciona un archivo de audio", // Validation message for required field
             })}
-            accept="audio/*"
+            accept="audio/*,video/*"
           />
           {/* Submit button */}
           <button className="btn btn-outline btn-accent" type="submit">
